@@ -28,3 +28,8 @@ Route::prefix('usuario')->group(function(){
     Route::post('perfil', [App\Http\Controllers\UsuarioController::class, 'perfil']);
 });
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/posts', [PostController::class, 'index']);       // listar posts
+    Route::post('/posts', [PostController::class, 'store']);      // criar post
+});
+
