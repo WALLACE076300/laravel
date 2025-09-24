@@ -1,15 +1,15 @@
 <?php
 
-	namespace App\Http\Controllers;
-
+namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class UsuarioController extends Controller
 {
-   
-    function registrar(Request $request) 
+    public function registrar(Request $request) 
     {
         $dados = $request->validate([
             'name' => 'required|string|max:255',
@@ -18,7 +18,7 @@ class UsuarioController extends Controller
         ]);
 
         $dados['password'] = bcrypt($dados['password']);
-        $dados['picture'] = '';
+        $dados['picture'] = 'https://cdn0.iconfinder.com/data/icons/seo-web-4-1/128/Vigor_User-Avatar-Profile-Photo-02-1024.png';
         $dados['status'] = 'active';
         $dados['enabled'] = true;
 
@@ -29,73 +29,75 @@ class UsuarioController extends Controller
         return response()->json([
             'message' => 'Usuário registrado com sucesso.',
             'user' => $usuario,
-            'token' => $token
+            'access_token' => $token,
+            'token_type' => 'Bearer'
         ], 201);
     }
 
-    function login(Request $request)
+    public function login(Request $request)
     {
-        $credenciais = $request->validate([
+        $request->validate([
             'email' => 'required|email',
-            'password' => 'required'
+            'password' => 'required|string',
         ]);
 
-        $usuario = User::where('email', $credenciais['email'])->first();
+        $user = User::where('email', $request->email)->first();
 
-        if (!$usuario || !\Hash::check($credenciais['password'], $usuario->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Credenciais inválidas'], 401);
         }
 
-        $token = $usuario->createToken('auth_token')->plainTextToken;
+        $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'Login realizado com sucesso.',
-            'user' => $usuario,
-            'token' => $token
+            'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user,
         ]);
     }
 
-
-    function logout(Request $request)
+    public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logout realizado com sucesso.']);
     }
 
+    public function fotoUpload(Request $request)
+{
+    $request->validate([
+        'picture' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+    ]);
 
-    function fotoUpload(Request $request)
+    $usuario = $request->user();
+
+    $path = $request->file('picture')->store('pictures', 'public');
+
+    $usuario->update(['picture' => $path]);
+
+    return response()->json([
+        'message' => 'Foto enviada com sucesso.',
+        // Aqui garantimos URL completa
+        'picture_url' => url('storage/' . $path)
+    ]);
+}
+
+
+    public function desativarConta(Request $request)
     {
-        $request->validate([
-            'picture' => 'required|image|mimes:jpg,jpeg,png|max:2048'
-        ]);
-
         $usuario = $request->user();
-        $path = $request->file('picture')->store('pictures', 'public');
 
-        $usuario->update(['picture' => $path]);
-
-        return response()->json([
-            'message' => 'Foto enviada com sucesso.',
-            'picture_url' => asset('storage/' . $path)
-        ]);
-    }
-
-
-    function desativarConta(Request $request)
-    {
-        $usuario = $request->user();
         $usuario->update(['enabled' => false, 'status' => 'inactive']);
 
         return response()->json(['message' => 'Conta desativada com sucesso.']);
     }
 
-    function perfil(Request $request)
+    public function perfil(Request $request)
     {
         return response()->json($request->user());
     }
 
-    function editar(Request $request)
+    public function editar(Request $request)
     {
         $usuario = $request->user();
 
